@@ -4,14 +4,19 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.ActivityNotFoundException;
 import android.content.ComponentName;
+import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.ServiceConnection;
 import android.content.pm.PackageManager;
+import android.os.Build;
 import android.os.Handler;
+import android.os.IBinder;
 import android.os.Message;
 import android.os.Messenger;
 import android.provider.Settings;
 import android.speech.RecognizerIntent;
+import android.support.annotation.RequiresApi;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.text.TextUtils;
@@ -28,15 +33,30 @@ public class MainActivity extends AppCompatActivity {
 
     private AlertDialog enableNotificationListenerAlertDialog;
 
+    private NotificationListener NotificationListeningService = new NotificationListener();
+
     private static final String ENABLED_NOTIFICATION_LISTENERS = "enabled_notification_listeners";
     private static final String ACTION_NOTIFICATION_LISTENER_SETTINGS = "android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS";
+
+    private ServiceConnection mServiceConnection = new ServiceConnection(){
+        @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN_MR2)
+        @Override
+        public void onServiceConnected(ComponentName name, IBinder service) {
+            //透過Binder調用Service內的方法
+            NotificationListener.MyIBinder myIBinder = (NotificationListener.MyIBinder) service;
+            NotificationListeningService = ((NotificationListener)myIBinder.getService());
+        }
+        @Override
+        public void onServiceDisconnected(ComponentName name) {
+            //service 物件設為null
+        }
+    };
 
     private int state = 0;
 
     TextView txtReplied;
 
     public class MessageHandler extends Handler {
-
         @Override
         public void handleMessage(Message message) {
             state = message.arg1;
@@ -74,8 +94,8 @@ public class MainActivity extends AppCompatActivity {
 
         Intent startService = new Intent(this, NotificationListener.class);
         startService.putExtra("MESSENGER", new Messenger(messageHandler));
+        bindService(startService, mServiceConnection, Context.BIND_AUTO_CREATE);
         startService(startService);
-        //startService(new Intent(this, NotificationListener.class));
     }
 
 
@@ -154,6 +174,7 @@ public class MainActivity extends AppCompatActivity {
     /**
      * Receiving speech input
      * */
+    @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN_MR2)
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
@@ -169,6 +190,7 @@ public class MainActivity extends AppCompatActivity {
                     txtReplied = findViewById(R.id.txt_inline_reply);
                     txtReplied.setText("The result is :"+result.get(0));
                     //txtSpeechInput.setText(result.get(0));
+                    NotificationListeningService.replyMessage(result.get(0));
                 }
                 break;
             }

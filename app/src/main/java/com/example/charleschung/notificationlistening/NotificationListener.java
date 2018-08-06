@@ -1,9 +1,11 @@
 package com.example.charleschung.notificationlistening;
 
 import android.app.Activity;
+import android.app.Service;
 import android.content.ActivityNotFoundException;
 import android.content.ContentValues;
 import android.database.sqlite.SQLiteDatabase;
+import android.os.Binder;
 import android.os.Message;
 import android.os.Messenger;
 import android.os.RemoteException;
@@ -112,6 +114,7 @@ public class NotificationListener extends NotificationListenerService {
 
     /** STT */
     private final int REQ_CODE_SPEECH_INPUT = 100;
+    private MyIBinder mBinder = new MyIBinder();
 
     private static class notificationWear{
         public static Bundle bundle;
@@ -127,11 +130,36 @@ public class NotificationListener extends NotificationListenerService {
         return super.onStartCommand(intent, flags, startId);
     }
 
+    /*
     @Override
     public IBinder onBind(Intent intent) {
         Log.d(TAG, "Notification bind");
 
-        return super.onBind(intent);
+        //return super.onBind(intent);
+        return mBinder;
+    }
+    */
+    @Override
+    public IBinder onBind(Intent intent) {
+
+        String action = intent.getAction();
+        Log.d(TAG, "onBind: " + action);
+
+        if (SERVICE_INTERFACE.equals(action)) {
+            Log.d(TAG, "Bound by system");
+            return super.onBind(intent);
+        } else {
+            Log.d(TAG, "Bound by application");
+            return mBinder;
+        }
+    }
+
+    public boolean onUnbind(Intent intent) {
+        return super.onUnbind(intent);
+    }
+
+    public String getText(){
+        return "Bind Success";
     }
 
     private static final class ApplicationPackageNames {
@@ -270,7 +298,7 @@ public class NotificationListener extends NotificationListenerService {
                 //promptSpeechInput();
 
                 //reply
-                reply(notificationWear.remoteInputs, notificationWear.bundle, notificationWear.pendingIntent);
+                //reply(notificationWear.remoteInputs, notificationWear.bundle, notificationWear.pendingIntent);
 
             }
         }
@@ -278,8 +306,12 @@ public class NotificationListener extends NotificationListenerService {
 
     }
 
+    public void replyMessage(String text){
+        reply(notificationWear.remoteInputs, notificationWear.bundle, notificationWear.pendingIntent, text);
+    }
+
     @RequiresApi(api = Build.VERSION_CODES.KITKAT_WATCH)
-    public void reply(RemoteInput[] remoteInputs, Bundle bundle, PendingIntent pendingIntent){
+    public void reply(RemoteInput[] remoteInputs, Bundle bundle, PendingIntent pendingIntent, String text){
         RemoteInput[] remoteInputList = new RemoteInput[remoteInputs.length];
 
         Intent localIntent = new Intent();
@@ -289,7 +321,7 @@ public class NotificationListener extends NotificationListenerService {
 
         for(RemoteInput remoteIn : remoteInputs){
             remoteInputList[i] = remoteIn;
-            localBundle.putCharSequence(remoteInputList[i].getResultKey(), "系統測試中");
+            localBundle.putCharSequence(remoteInputList[i].getResultKey(), text);
             i++;
         }
         RemoteInput.addResultsToIntent(remoteInputList, localIntent, localBundle);
@@ -395,6 +427,18 @@ public class NotificationListener extends NotificationListenerService {
             messageHandler.send(message);
         } catch (RemoteException e) {
             e.printStackTrace();
+        }
+    }
+
+    public class MyIBinder extends Binder {
+        /*
+        public NotificationListener getBinder(){
+            return NotificationListener.this;
+        }
+        */
+
+        public Service getService(){
+            return NotificationListener.this;
         }
     }
 }
